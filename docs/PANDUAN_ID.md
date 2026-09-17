@@ -64,7 +64,43 @@ flowchart TD
 
 ---
 
-## 3. Local (PC Sendiri) vs VPS: Analisis Keamanan & Sisi "Ga Enak"-nya
+## 3. Penjelasan Lengkap Variabel `.env`, RPC HTTP, WSS, & Private Relay
+
+Memahami setiap konfigurasi pada file `.env` sangat penting agar Anda tidak salah memasukkan data atau bingung mencari endpoint:
+
+### A. Perbedaan 3 Jenis Endpoint
+1. **`RPC_HTTP_URL` (Regular HTTP/HTTPS RPC):**
+   - **Fungsi:** Untuk **membaca** data on-chain secara statis: memeriksa saldo token di wallet korban, mengambil nonce transaksi, membaca decimals token, dan menghitung estimasi base gas.
+   - **Kapan Dipakai:** Selalu aktif di seluruh mode (`claim`, `listen`, `nft`, `native`).
+2. **`RPC_WSS_URL` (WebSocket RPC - `wss://`):**
+   - **Fungsi:** Saluran komunikasi real-time 2 arah. Node blockchain akan langsung "menembak" notifikasi ke terminal Anda saat ada blok baru yang ditambang (<50 milidetik).
+   - **Kapan Dipakai:** **Wajib khusus mode `listen`** (auto-sweeper pasif). Tanpa WSS, script tidak bisa memantau blok secara instan.
+3. **`FLASHBOTS_RELAY_URL` (Private Relay Endpoint):**
+   - **Fungsi:** Gerbang privat langsung menuju Block Builder / Penambang MEV.
+   - **Kapan Dipakai:** Saat bundle penyelamatan **dikirim (broadcast)**. Transaksi Anda **TIDAK PERNAH masuk ke mempool publik**, sehingga bot drainer yang memantau wallet Anda tidak bisa melihat apa pun sebelum transaksi sah masuk ke dalam blok.
+   - *Mainnet:* `https://relay.flashbots.net` | *Sepolia:* `https://relay-sepolia.flashbots.net`
+
+### B. Di Mana Mengambil RPC (HTTP & WSS) dan Berapa Biayanya?
+> 💰 **BIAYANYA 100% GRATIS!** Anda tidak perlu membayar layanan berbayar apa pun.
+
+- **[Alchemy.com](https://www.alchemy.com/):**
+  1. Buat akun gratis.
+  2. Buka menu **Apps** $\to$ Klik **Create App** (pilih chain seperti Ethereum / Sepolia / Base).
+  3. Klik **API Key**:
+     - Salin link **HTTPS** untuk `RPC_HTTP_URL`.
+     - Klik tab **WebSockets** dan salin link **WSS** untuk `RPC_WSS_URL`.
+  *(Free tier Alchemy menyediakan 300 juta Compute Units per bulan, sangat cukup untuk ribuan transaksi).*
+- **Public RPC Sepolia:** Jika hanya ingin latihan di Sepolia, Anda bisa menggunakan `https://rpc.sepolia.org` secara gratis tanpa daftar.
+
+### C. Penjelasan 4 Kunci Wallet di `.env`
+1. `COMPROMISED_PRIVATE_KEY`: Kunci privat wallet korban yang bocor (tempat aset tertahan).
+2. `SPONSOR_PRIVATE_KEY`: Kunci privat wallet bersih yang berisi saldo native ETH/BNB untuk mendanai gas.
+3. `SAFE_DESTINATION_ADDRESS`: Alamat publik (`0x...`) wallet aman baru tempat aset dikirimkan.
+4. `FLASHBOTS_AUTH_SIGNER_KEY`: Kunci privat wallet acak baru (boleh saldo 0). Hanya digunakan Flashbots sebagai identitas kriptografis untuk mencegah spam serangan DoS ke relay.
+
+---
+
+## 4. Local (PC Sendiri) vs VPS: Analisis Keamanan & Sisi "Ga Enak"-nya
 
 Pertanyaan paling sering muncul: *"Apakah harus sewa VPS atau jalankan di laptop/PC sendiri?"*
 

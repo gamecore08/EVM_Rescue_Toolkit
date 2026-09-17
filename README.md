@@ -139,11 +139,53 @@ npm install
 cp .env.example .env
 ```
 
-### 4 Variabel Wajib pada `.env`:
-1. `COMPROMISED_PRIVATE_KEY` : Private key wallet korban (yang bocor).
-2. `SPONSOR_PRIVATE_KEY` : Private key wallet bersih penyedia saldo gas.
-3. `SAFE_DESTINATION_ADDRESS` : Alamat wallet baru yang aman untuk menerima aset.
-4. `FLASHBOTS_AUTH_SIGNER_KEY` : Private key baru/kosong untuk reputasi Flashbots bundle relay.
+---
+
+## 🔌 Panduan Lengkap `.env`, RPC HTTP, WSS, & Private Relay
+
+Bagi pemula yang baru pertama kali menyetel konfigurasi bot/script Web3, berikut panduan lengkap mengenai apa saja yang harus diisi di `.env`, di mana mengambilnya, dan untuk apa fungsinya:
+
+### 1. Perbedaan 3 Jenis Endpoint di Toolkit
+
+| Nama di `.env` | Jenis Endpoint | Fungsi Utama | Kapan Dipakai? |
+|---|---|---|---|
+| `RPC_HTTP_URL` | **Regular RPC (HTTP/S)** | **MEMBACA data**: Membaca saldo token korban, nonce transaksi, dan estimasi base gas. | Dipakai di **semua mode**. |
+| `RPC_WSS_URL` | **WebSocket RPC (`wss://`)** | **MENDENGARKAN event**: Saluran pipa real-time 2 arah agar node langsung memberi tahu laptop Anda begitu ada blok baru (<50ms). | **WAJIB untuk mode `listen`** (auto-sweeper pasif). |
+| `FLASHBOTS_RELAY_URL` | **Private Relay Endpoint** | **MENGIRIM transaksi privat**: Menyerahkan bundle atomik langsung ke Block Builder **tanpa lewat mempool publik**. | Dipakai saat **mengeksekusi penyelamatan** agar bot drainer buta. |
+
+### 2. Di Mana Mengambil RPC (HTTP & WSS) dan Berapa Biayanya?
+
+> 💰 **BIAYANYA 100% GRATIS (FREE TIER)!**  
+> Anda **tidak perlu membayar sepeser pun**. Provider Web3 RPC terkemuka menyediakan paket gratis yang kuotanya sangat berlimpah (ratusan juta request per bulan):
+
+1. **[Alchemy](https://www.alchemy.com/) (Paling Direkomendasikan):**
+   - Daftar akun gratis di Alchemy.
+   - Klik **"Create App"** $\to$ Pilih Network (misal: *Ethereum*, *Sepolia*, *Base*, atau *Arbitrum*).
+   - Klik tombol **"API Key"**:
+     - Salin bagian **HTTPS** $\to$ Tempel ke `RPC_HTTP_URL` di `.env`.
+     - Klik tab **WebSockets** dan salin bagian **WSS** $\to$ Tempel ke `RPC_WSS_URL` di `.env`.
+2. **[Infura](https://www.infura.io/):**
+   - Daftar akun gratis $\to$ Buat API Key $\to$ Dapatkan URL HTTPS dan WSS di tab Endpoints.
+3. **Public RPC Gratis (Khusus Sepolia Testnet):**
+   - `RPC_HTTP_URL=https://rpc.sepolia.org`
+
+### 3. Untuk Apa Private Relay (`FLASHBOTS_RELAY_URL`) Dipakai?
+
+Jika Anda mengirim transaksi lewat RPC biasa (seperti MetaMask pada umumnya), transaksi Anda akan mengapung di **mempool publik**. Bot drainer yang memantau wallet bocor Anda akan langsung melihatnya dan menyerobot (*front-run*) uang Anda.
+
+**Private Relay** adalah jalur khusus "bawah tanah":
+- Bundle transaksi dikirim langsung ke meja validator/block builder.
+- Tidak ada yang bisa melihat transaksi tersebut sampai blok tersebut selesai ditambang di blockchain.
+- **Relay Resmi Flashbots:**
+  - Mainnet: `https://relay.flashbots.net`
+  - Sepolia Testnet: `https://relay-sepolia.flashbots.net`
+
+### 4. Penjelasan 4 Kunci Utama di `.env`
+
+- `COMPROMISED_PRIVATE_KEY`: Private key wallet Anda yang sudah bocor / dipantau bot drainer.
+- `SPONSOR_PRIVATE_KEY`: Private key wallet baru yang bersih dan memiliki saldo ETH/BNB untuk membayar gas penyelamatan.
+- `SAFE_DESTINATION_ADDRESS`: Alamat publik (`0x...`) wallet dingin penampung aset yang aman.
+- `FLASHBOTS_AUTH_SIGNER_KEY`: Private key wallet sembarang baru (boleh kosong melompong tanpa saldo). Kunci ini hanya digunakan relay Flashbots sebagai "tanda tangan identitas" untuk mengukur reputasi bundle dan mencegah serangan DoS.
 
 ---
 

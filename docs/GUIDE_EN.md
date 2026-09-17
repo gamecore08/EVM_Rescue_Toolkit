@@ -64,7 +64,43 @@ flowchart TD
 
 ---
 
-## 3. Local Execution vs Cloud VPS: Security Analysis & The Downsides
+## 3. Understanding `.env`, HTTP/WSS RPCs, & Private Relays
+
+Understanding each parameter in your `.env` configuration avoids costly mistakes and clarifies where to obtain endpoints:
+
+### A. The 3 Types of Network Endpoints
+1. **`RPC_HTTP_URL` (Standard HTTP/HTTPS RPC):**
+   - **Purpose:** Used for **reading** on-chain state: querying token balances on the victim wallet, checking account nonces, fetching token decimals, and estimating current base fees.
+   - **When is it used?** Active in all execution modes (`claim`, `listen`, `nft`, `native`).
+2. **`RPC_WSS_URL` (WebSocket RPC - `wss://`):**
+   - **Purpose:** A persistent 2-way real-time pipe. The blockchain node pushes block updates to your local terminal immediately upon confirmation (<50ms).
+   - **When is it used?** **Mandatory for `listen` mode** (passive auto-sweeper).
+3. **`FLASHBOTS_RELAY_URL` (Private Relay Endpoint):**
+   - **Purpose:** A private tunnel directly to MEV block builders / validators.
+   - **When is it used?** Used when **submitting rescue bundles**. Your transactions **NEVER land in the public mempool**, blinding drainer bots until your bundle is already confirmed.
+   - *Mainnet:* `https://relay.flashbots.net` | *Sepolia:* `https://relay-sepolia.flashbots.net`
+
+### B. Where to Get RPC Endpoints (HTTP & WSS) & Pricing
+> 💰 **COST: 100% FREE!** You do not need any paid subscription.
+
+- **[Alchemy.com](https://www.alchemy.com/):**
+  1. Create a free account.
+  2. Navigate to **Apps** $\to$ Click **Create App** (choose your target chain: Ethereum, Sepolia, Base, etc.).
+  3. Click **API Key**:
+     - Copy the **HTTPS** URL $\to$ paste to `RPC_HTTP_URL` in `.env`.
+     - Click the **WebSockets** tab and copy the **WSS** URL $\to$ paste to `RPC_WSS_URL` in `.env`.
+  *(Alchemy's free tier provides 300M Compute Units/month, far exceeding requirements).*
+- **Public RPC (Sepolia Testnet):** Use `https://rpc.sepolia.org` with no signup required.
+
+### C. The 4 Wallet Keys Explained
+1. `COMPROMISED_PRIVATE_KEY`: Private key of the compromised account holding the assets.
+2. `SPONSOR_PRIVATE_KEY`: Private key of your clean funding wallet providing native ETH/BNB to pay for gas.
+3. `SAFE_DESTINATION_ADDRESS`: Public address (`0x...`) of your clean cold storage wallet receiving the rescued assets.
+4. `FLASHBOTS_AUTH_SIGNER_KEY`: Any freshly generated random private key (can have 0 balance). Used solely by Flashbots relays as a cryptographic signature identity to track bundle reputation and mitigate DoS attacks.
+
+---
+
+## 4. Local Execution vs Cloud VPS: Security Analysis & The Downsides
 
 A critical engineering decision is whether to run the toolkit on your **Local Machine** or on a **Cloud VPS**.
 
