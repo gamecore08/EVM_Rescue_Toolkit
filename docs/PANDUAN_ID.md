@@ -1,5 +1,7 @@
 # 📘 Panduan Lengkap (Bahasa Indonesia)
 
+`Author:` [@Prasetyo_HK](https://x.com/Prasetyo_HK) • `Status:` Active Development
+
 ## 1. Konsep Dasar: Private Bundle vs Public Mempool
 
 Secara normal, setiap transaksi yang dikirim ke jaringan EVM masuk dulu ke **mempool publik** — ruang tunggu terbuka yang dipantau oleh drainer bot 24/7. Jika kamu mengirim gas (ETH/BNB/MATIC) ke wallet yang bocor melalui transaksi biasa, bot akan mendeteksi transaksi pending tersebut dan langsung memotongnya (*front-run*) sebelum kamu sempat menggunakannya untuk menyelamatkan aset.

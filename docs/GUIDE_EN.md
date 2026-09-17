@@ -1,5 +1,7 @@
 # 📘 Full Technical Guide (English)
 
+`Author:` [@Prasetyo_HK](https://x.com/Prasetyo_HK) • `Status:` Active Development
+
 ## 1. Core Concept: Private Bundle vs Public Mempool
 
 Normally, every transaction broadcast to an EVM network lands in the **public mempool** first — an open waiting pool monitored 24/7 by drainer bots. If you transfer native gas (ETH/BNB/MATIC) to a compromised wallet through standard transactions, the bot immediately spots the pending incoming tx and front-runs it, siphoning off the funds before your rescue operation can take place.

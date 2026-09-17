@@ -1,5 +1,7 @@
 # 🛡️ evm-rescue-toolkit
 
+`Author:` [@Prasetyo_HK](https://x.com/Prasetyo_HK) • `Status:` Active Development
+
 Toolkit whitehat untuk menyelamatkan aset dari **wallet EVM sendiri yang bocor** (private key ter-expose / dipantau drainer bot), menggunakan **Flashbots bundle**: gas disponsori dan transaksi klaim/transfer dikirim sebagai satu paket atomik lewat jalur privat — tidak lewat mempool publik — sehingga drainer bot yang memantau alamatmu **tidak sempat mendahului**.
 
 Referensi resmi yang dipakai sebagai dasar: [flashbots/searcher-sponsored-tx](https://github.com/flashbots/searcher-sponsored-tx) & [Flashbots Quick Start](https://docs.flashbots.net/flashbots-auction/quick-start).
