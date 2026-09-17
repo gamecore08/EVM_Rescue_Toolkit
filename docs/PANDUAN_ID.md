@@ -342,20 +342,117 @@ Catatan: Saya tidak akan memberikan private key saya demi alasan keamanan.
 
 ---
 
-## 9. ⚠️ Threat Model & Batasan Toolkit (Kapan Tool Ini TIDAK Bisa Menolong?)
+<a id="faq-threat-model-time-locked"></a>
+## 9. ⏳ FAQ & Threat Model: Skenario Aset Terikat Waktu & Syarat Khusus
 
-Toolkit ini adalah alat bantu balapan private bundle, bukan solusi mutlak untuk segala insiden. Ada skenario tertentu di mana aset **secara teknis mustahil diselamatkan**:
+Bagian ini menjelaskan skenario-skenario di mana aset **tidak bisa langsung diselamatkan dalam satu bundle atomik**, karena ada jeda waktu (*time delay*) atau syarat pihak ketiga yang harus dipenuhi terlebih dahulu.
 
-1. **Token dengan Blacklist Function (USDT, USDC, dll):**  
-   Jika alamat korban telah diblacklist on-chain oleh penerbit token (misal Tether atau Circle) karena terindikasi korban eksploit, transaksi transfer akan selalu revert.
-2. **Kontrak yang Sedang Di-Pause:**  
-   Jika fungsi `claim()` atau `transfer()` dinonaktifkan oleh pemilik protokol (`whenNotPaused`), bundle akan gagal simulasi sampai pause dibuka kembali.
-3. **Token Pajak Ekstrem / Honeypot:**  
-   Token dengan mekanisme pemotongan pajak tinggi atau fungsi transfer terlarang dapat menyebabkan saldo yang mendarat berkurang drastis atau transaksi revert.
-4. **Lonjakan BaseFee Melebihi Buffer:**  
-   Jika basefee melonjak tajam melebihi estimasi buffer 25% antara simulasi dan konfirmasi, bundle akan ditolak builder karena gas kurang.
-5. **Aset Sudah Ditransfer Keluar Sebelumnya:**  
-   Jika bot drainer telah menyapu bersih aset sebelum Anda sempat menjalankan toolkit ini, transaksi on-chain bersifat final dan tidak bisa di-revert.
+> [!IMPORTANT]
+> **Prinsip Dasar: Aksi Instan vs Menunggu Waktu**  
+> Toolkit ini dirancang optimal untuk aksi yang bisa dieksekusi **instan dalam satu blok** (Klaim $\rightarrow$ Transfer ke Safe Wallet).  
+> Begitu ada faktor waktu tunggu (menit, jam, atau hari), strategi penyelamatan berubah dari *"eksekusi sekali jalan"* menjadi *"pantau lalu eksekusi tepat saat window terbuka"*.
+>
+> Selama compromised wallet hanya dipantau pasif oleh bot drainer (menunggu saldo native gas masuk untuk langsung disapu), toolkit **tetap efektif** menyelamatkan aset di titik waktu ketika aset tersebut akhirnya cair — asalkan bundle atomik dieksekusi tepat pada window waktu tersebut.
+
+---
+
+### 1. Airdrop Non-Transferable (Menunggu Dev Mengaktifkan Transfer)
+
+* **Situasi:** Anda sudah klaim airdrop dan token sudah tercatat di saldo wallet (`balanceOf` ada saldo), tetapi smart contract token memiliki flag internal seperti `transfersEnabled = false` yang membuat fungsi `transfer()` selalu revert hingga developer membukanya (biasanya setelah TGE atau listing CEX).
+* **Kenapa Toolkit Tidak Bisa Membantu Saat Ini:** Transaksi transfer akan selalu *revert* terlepas dari berapa pun gas atau priority tip yang Anda berikan. Ini bukan masalah kecepatan atau gas, melainkan pembatasan logika smart contract token itu sendiri.
+* **Solusi & Strategi Taktis:**
+  1. **Pantau kontrak token, bukan wallet Anda:** Cek fungsi publik seperti `transfersEnabled()`, `paused()`, atau event log `TransfersEnabled` di block explorer.
+  2. **Gunakan mode `listen` yang dimodifikasi:** Ubah pengecekan script `listen` agar memantau kembalian boolean `transfersEnabled()` alih-alih `balanceOf()`.
+  3. **Eksekusi instan begitu aktif:** Begitu flag berubah menjadi `true`, segera kirim bundle atomik di blok yang sama karena drainer kemungkinan besar juga memonitor hal yang sama.
+  4. **Jangan sentuh allowance:** Hindari interaksi approval apa pun ke pihak luar selama masa tunggu.
+* **Keterbatasan Nyata:** Jika developer membuka transfer secara bertahap (whitelist batch) tanpa transparansi jadwal, Anda harus menjalankan monitoring dengan uptime yang stabil di PC lokal.
+
+---
+
+### 2. Token Locked dengan Auto-Unlock Pasti (Vesting / Lock Schedule)
+
+* **Situasi:** Token Anda terkunci di kontrak lock (misalnya TeamFinance, PinkLock, UNCX, atau kontrak vesting proyek) dengan jadwal unlock otomatis berdasarkan timestamp blok (`block.timestamp >= unlockTime`).
+* **Perbedaan Penting:** Waktu unlock di sini bersifat **deterministik dan publik** — siapa pun bisa membaca `unlockTime()` di explorer.
+* **Solusi & Strategi Taktis:**
+  1. **Baca smart contract:** Panggil fungsi baca seperti `unlockTime()`, `releaseTime()`, atau `vestingSchedule()`.
+  2. **Hitung mundur waktu unlock:** Jadwalkan eksekusi beberapa detik menjelang detik unlock (bukan sesudahnya).
+  3. **Gunakan mode `claim`:** Arahkan calldata ke fungsi `release()` atau `withdraw()` milik kontrak lock, dirangkai dalam bundle yang sama dengan transfer ke safe destination.
+  4. **Multi-Relay Broadcast:** Karena bot drainer juga mengetahui timestamp publik ini, terjadi *race condition* di blok unlock. Pengiriman bundle ke **Flashbots + Titan + BeaverBuild + Rsync** sekaligus sangat krusial untuk memenangkan blok tersebut.
+* **Keterbatasan Nyata:** Jika bot drainer memasang bundle otomatis dengan priority tip yang jauh lebih ekstrem persis di blok unlock, Anda bisa kalah murni akibat persaingan gas/tip. Tingkatkan `priorityGwei` secara agresif untuk momen unlock publik ini.
+
+---
+
+### 3. Token Unstaking dengan Delay Timer / Cooldown Period
+
+* **Situasi:** Anda memanggil `unstake()` atau `requestWithdrawal()`, tetapi protokol menerapkan masa cooldown (misal 7–21 hari pada liquid staking atau lending) sebelum token bisa ditarik lewat `claimWithdrawal()` atau `completeUnstake()`.
+* **Strategi Dua Tahap (2x Eksekusi Terpisah, Bukan 1 Command Otomatis):**
+  * **Tahap A — Mengajukan Permintaan Unstake (Sekarang):**  
+    Jalankan bundle atomik mode `claim` untuk memanggil `requestWithdrawal()`:
+    * Tx 1: Sponsor kirim native gas.
+    * Tx 2: Panggil `unstake()`.  
+    * *Catatan:* Tidak ada aset yang berpindah ke safe wallet di tahap ini, risikonya sangat minim.
+  * **Tahap B — Menarik Aset Pasca Cooldown Selesai (Nanti):**  
+    Setelah `readyTimestamp` tercapai, jalankan bundle atomik kedua secara manual:
+    * Tx 1: Sponsor kirim gas.
+    * Tx 2: Panggil `completeUnstake()`.
+    * Tx 3: Transfer token ke safe wallet.
+* **Keterbatasan Nyata:** Toolkit tidak dapat mempercepat periode cooldown jaringan. Anda wajib menunggu waktu cooldown selesai secara alami.
+
+---
+
+### 4. Matriks Keputusan: Kapan Toolkit Efektif vs Kapan Harus Menunggu
+
+| Skenario | Bisa Eksekusi Sekarang? | Strategi Penyelamatan | Mode Toolkit |
+| :--- | :---: | :--- | :--- |
+| **Airdrop Siap Klaim** (Tanpa gas) | ✅ **Langsung** | Bundle atomik 1x jalan (Sponsor + Klaim + Transfer) | `npm run rescue -- --mode claim` |
+| **Airdrop Non-Transferable** (Nunggu Dev) | ❌ **Tunggu Dev** | Pantau state kontrak (`transfersEnabled`), eksekusi instan saat aktif | Modifikasi `npm run rescue -- --mode listen` |
+| **Token Locked / Vesting** (Waktu Pasti) | ⏳ **Tepat Waktu** | Hitung mundur block timestamp, tembak bundle + multi-relay | `npm run rescue -- --mode claim` (Target: Lock) |
+| **Unstaking Cooldown** (Delay 7-21 Hari) | ⏳ **2 Tahap Terpisah** | **2x eksekusi manual terpisah**: Tahap 1 ajukan unstake, Tahap 2 tarik & sweep setelah cooldown | `npm run rescue -- --mode claim` (2x beda waktu) |
+| **Malicious Allowance Aktif** | ⚠️ **Bahaya** | Wajib cabut (revoke) izin jahat sebelum/dalam bundle | Revoke + Transfer |
+
+---
+
+### 5. 6 Skenario Tambahan yang Sering Terlewat
+
+> [!WARNING]
+> **PERINGATAN KRUSIAL: Malicious Allowance (Persetujuan Jahat) adalah Risiko Aktif!**  
+> Skenario ini berbeda dari kasus penundaan waktu biasa: jika wallet Anda pernah menandatangani `approve()` atau `setApprovalForAll()` ke smart contract drainer, drainer dapat menarik token Anda via `transferFrom()` secara instan begitu saldo muncul — bahkan tanpa perlu memantau mempool!  
+> **Langkah Wajib:** Cek seluruh approval aktif di [Revoke.cash](https://revoke.cash) atau explorer. Jika ada approval jahat, bundle atomik Anda wajib menyertakan transaksi `approve(drainer, 0)` sebelum transaksi pemindahan aset.
+
+#### a. Vesting Linear (Bertahap, Bukan Sekali Unlock)
+Beberapa protokol tidak membuka token 100% sekaligus, melainkan bertahap sedikit demi sedikit per hari atau per blok.  
+* **Tindakan:** Jangan menunggu hingga 100% terkumpul. Jalankan sweep berkala untuk setiap porsi yang bisa ditarik (`releasableAmount() > 0`) agar drainer tidak mencuri tetesan token tersebut satu per satu.
+
+#### b. Snapshot / Whitelist Berbasis Block Height
+Beberapa airdrop menolak klaim (`revert: not eligible`) jika dipanggil sebelum nomor blok snapshot tertentu diaktifkan on-chain.  
+* **Tindakan:** Verifikasi eligibilitas via fungsi baca `isEligible(address)` di explorer sebelum mengeksekusi CLI.
+
+#### c. Klaim yang Membutuhkan Kepemilikan NFT Tertentu (Gated Claim)
+Jika airdrop hanya bisa diklaim oleh pemegang NFT tertentu dan NFT tersebut berada di compromised wallet:  
+* **Tindakan:** Amankan NFT terlebih dahulu menggunakan `npm run rescue -- --mode nft`, baru jalankan klaim token jika fungsi klaim memvalidasi kepemilikan NFT pada saat pemanggilan.
+
+#### d. Klaim Lintas-Chain (Cross-Chain Airdrop)
+Jika klaim dilakukan di satu chain (misal Ethereum) tetapi aset cair di chain lain (misal Arbitrum):  
+* **Tindakan:** Toolkit tidak bisa menggabungkan transaksi multi-chain dalam 1 bundle privat (batasan arsitektur Flashbots). Anda harus menjalankan proses terpisah pada masing-masing chain dengan RPC dan sponsor gas yang sesuai.
+
+#### e. Gas Spike Antara Waktu Simulasi dan Eksekusi
+Jika ada jeda waktu lama antara `--dry-run` dan eksekusi nyata (karena menunggu jam unlock):  
+* **Tindakan:** *Base fee* jaringan bisa melonjak tinggi. Selalu jalankan ulang `--dry-run` 10–30 detik sebelum eksekusi riil, dan siapkan buffer saldo native pada sponsor wallet 20–30% lebih tinggi dari estimasi.
+
+#### f. Batasan Mutlak Smart Contract Lainnya
+1. **Token dengan Blacklist Function (USDT, USDC):** Jika alamat korban sudah diblacklist oleh penerbit token, `transfer()` akan selalu revert.
+2. **Kontrak yang Sedang Di-Pause:** Jika fungsi dinonaktifkan oleh admin (`whenNotPaused`), bundle akan gagal simulasi.
+3. **Token Pajak Ekstrem / Honeypot:** Token dengan potongan pajak tinggi atau transfer terlarang akan gagal dikirim ke safe wallet.
+4. **Aset Sudah Ditransfer Keluar Sebelumnya:** Jika drainer sudah menguras aset sebelum toolkit dijalankan, transaksi blockchain bersifat permanen dan tidak bisa dibatalkan.
+
+---
+
+### 6. Kesimpulan & Rekomendasi Taktis
+
+* **Aset Cair Instan:** Gunakan mode `claim`, `nft`, atau `native` untuk eksekusi 1-blok yang cepat dan bersih.
+* **Jadwal Pasti (Lock/Cooldown):** Pasang alarm, lakukan dry-run sesaat sebelum jadwal, dan gunakan multi-relay broadcast untuk memenangkan blok unlock.
+* **Tergantung Pihak Ketiga (Dev Switch):** Gunakan mode pemantauan aktif (`listen`) di PC lokal dengan uptime terjaga.
+* **Wallet Terpapar Allowance:** Segera audit via [Revoke.cash](https://revoke.cash) sebelum melakukan penyelamatan apa pun.
 
 ---
 

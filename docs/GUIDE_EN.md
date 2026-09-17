@@ -332,20 +332,117 @@ Note: I will NOT share my private keys with you for security reasons.
 
 ---
 
-## 8. ⚠️ Threat Model & Limitations (When Can This Tool NOT Help?)
+<a id="faq-threat-model-time-locked"></a>
+## 8. ⏳ FAQ & Threat Model: Time-Locked & Conditional Asset Scenarios
 
-This toolkit is an MEV whitehat acceleration engine, not magic. There are explicit on-chain constraints where asset recovery is **technically impossible**:
+This section explains scenarios where assets **cannot be rescued immediately in a single atomic bundle**, because a time delay or external third-party condition must be met first.
 
-1. **Tokens with Blacklist/Freezing Functions (e.g. USDT, USDC):**  
-   If the victim address is flagged and blacklisted on-chain by the token issuer (compliance freeze), any `transfer()` call will immediately revert.
-2. **Paused Smart Contracts:**  
-   If the staking or token contract is globally paused by project administrators (`whenNotPaused`), claim and transfer calls will revert until unpaused.
-3. **High-Tax / Honeypot Tokens:**  
-   Tokens with predatory transfer taxes or malicious contract code will deduct extreme fees or reject transfers to external safe wallets.
-4. **Sudden BaseFee Surges:**  
-   If base fees spike beyond the 25% buffer between simulation and inclusion, block builders may drop the bundle due to insufficient gas coverage.
-5. **Assets Already Siphoned Prior to Launch:**  
-   If the attacker has already transferred the funds prior to launching this tool, confirmed blockchain transactions are immutable and cannot be recalled.
+> [!IMPORTANT]
+> **Core Principle: Instant Execution vs Waiting Windows**  
+> This toolkit is engineered for actions executable **instantly within one single block** (Claim $\rightarrow$ Transfer to Safe Wallet).  
+> Once a waiting factor is involved (minutes, hours, or days), the rescue strategy shifts from *"one-shot execution"* to *"monitor, then strike the moment conditions are satisfied"*.
+>
+> As long as the compromised wallet is only passively monitored by a drainer bot (waiting for native gas to appear so it can sweep it), the toolkit **remains fully effective** at rescuing the asset the moment it finally becomes liquid/transferable — provided you execute the atomic bundle right during that exact window.
+
+---
+
+### 1. Non-Transferable Airdrops (Waiting for Devs to Enable Transfers)
+
+* **Situation:** You have claimed an airdrop and the tokens appear in your wallet balance (`balanceOf` shows balance), but the token smart contract enforces an internal flag like `transfersEnabled = false` which causes any `transfer()` call to revert until project developers enable it (usually post-TGE or exchange listing).
+* **Why the Toolkit Cannot Help Right Now:** Any transfer transaction will strictly *revert*, regardless of how much gas or priority tip you provide. This is not a speed or gas issue, but an immutable smart contract logic constraint.
+* **Tactical Strategy:**
+  1. **Monitor the token contract, not your wallet:** Watch public functions like `transfersEnabled()`, `paused()`, or the `TransfersEnabled` event log on the block explorer.
+  2. **Use a modified `listen` mode:** Adjust the `listen` script to poll the boolean state of `transfersEnabled()` instead of `balanceOf()`.
+  3. **Execute immediately upon activation:** The moment the flag flips to `true`, dispatch the atomic bundle in the same block, as drainer bots are likely tracking the exact same trigger.
+  4. **Do not touch allowances:** Avoid interacting with any external approvals during the waiting period.
+* **Honest Limitation:** If the project team enables transfers in batches (whitelist-based) without a public schedule, you will need continuous automated polling running on a local PC with reliable uptime.
+
+---
+
+### 2. Locked Tokens with Fixed Auto-Unlock (Vesting / Lock Schedule)
+
+* **Situation:** Your tokens are locked inside a vesting or locker contract (e.g. TeamFinance, PinkLock, UNCX, or a custom project contract) with an automatic unlock schedule governed by block timestamp (`block.timestamp >= unlockTime`).
+* **Key Difference:** Here the unlock time is **deterministic and publicly readable** — anyone can check `unlockTime()` on a block explorer.
+* **Tactical Strategy:**
+  1. **Inspect the lock contract:** Query read-only functions like `unlockTime()`, `releaseTime()`, or `vestingSchedule()`.
+  2. **Count down to unlock:** Prepare execution a few seconds prior to the unlock timestamp (not after).
+  3. **Use `claim` mode:** Target the calldata to the locker's `release()` or `withdraw()` function, packaged in the same atomic bundle with the transfer to the safe wallet.
+  4. **Multi-Relay Broadcast:** Because drainer bots also have access to this public unlock schedule, a direct block race condition occurs. Submitting to **Flashbots + Titan + BeaverBuild + Rsync** simultaneously is essential to maximize inclusion odds.
+* **Honest Limitation:** If an automated drainer has pre-armed a bundle with an extreme priority tip specifically targeting the unlock block, you could lose purely on gas auction economics. Consider raising `priorityGwei` significantly for public unlock moments.
+
+---
+
+### 3. Token Unstaking with Delay Timer / Cooldown Period
+
+* **Situation:** You call `unstake()` or `requestWithdrawal()`, but the protocol enforces a mandatory cooldown period (e.g., 7–21 days in liquid staking or lending protocols) before tokens can be withdrawn via `claimWithdrawal()` or `completeUnstake()`.
+* **Two-Stage Strategy (2 Separate Manual Executions, Not Auto-Scheduled):**
+  * **Stage A — Initiating Unstake (Now):**  
+    Execute an atomic bundle in `claim` mode to register `requestWithdrawal()`:
+    * Tx 1: Sponsor supplies native gas.
+    * Tx 2: Call `unstake()`.  
+    * *Note:* No assets leave the wallet at this stage; risk is minimal.
+  * **Stage B — Withdrawing After Cooldown Expires (Later):**  
+    Once `readyTimestamp` is reached, execute a second atomic bundle manually:
+    * Tx 1: Sponsor supplies gas.
+    * Tx 2: Call `completeUnstake()`.
+    * Tx 3: Transfer token to safe destination.
+* **Honest Limitation:** The toolkit cannot bypass or accelerate protocol-enforced cooldowns. You must wait out the duration.
+
+---
+
+### 4. Decision Matrix: Instant vs Delayed Scenarios
+
+| Scenario | Executable Now? | Recovery Strategy | Toolkit Mode |
+| :--- | :---: | :--- | :--- |
+| **Airdrop Ready to Claim** (No Gas) | ✅ **Immediately** | One-shot atomic bundle (Sponsor + Claim + Safe Transfer) | `npm run rescue -- --mode claim` |
+| **Non-Transferable Airdrop** (Dev Waiting) | ❌ **Wait for Dev** | Monitor contract state (`transfersEnabled`), strike instantly upon toggle | Modified `npm run rescue -- --mode listen` |
+| **Locked Token / Vesting** (Fixed Time) | ⏳ **At Exact Time** | Count down block timestamp, fire bundle + multi-relay broadcast | `npm run rescue -- --mode claim` (Target: Lock Contract) |
+| **Unstaking Cooldown** (7-21 Day Delay) | ⏳ **2 Separate Stages** | **2 distinct manual runs**: Stage 1 request unstake, Stage 2 claim & sweep post-cooldown | `npm run rescue -- --mode claim` (Twice, spaced apart) |
+| **Malicious Allowance Active** | ⚠️ **Danger** | Mandatory revoke malicious approval before/within bundle | Revoke + Transfer |
+
+---
+
+### 5. 6 Overlooked Edge Cases
+
+> [!WARNING]
+> **CRITICAL WARNING: Malicious Active Allowances Are an Active Persistent Threat!**  
+> This scenario is fundamentally different from time delays: if the compromised wallet has ever signed an `approve()` or `setApprovalForAll()` to a drainer contract, the attacker can pull tokens via `transferFrom()` instantly the second tokens arrive — without even watching the mempool!  
+> **Mandatory Action:** Check all active token approvals at [Revoke.cash](https://revoke.cash) or Etherscan. If a malicious approval exists, your bundle must include a transaction revoking that approval (`approve(drainer, 0)`) prior to moving the tokens.
+
+#### a. Linear Vesting (Continuous Trickle Release)
+Some protocols release tokens continuously per block or per day rather than in a lump sum.  
+* **Action:** Do not wait for 100% accumulation. Periodically sweep available portions (`releasableAmount() > 0`) so the drainer cannot siphon smaller batches one by one.
+
+#### b. Snapshot / Block-Height Gated Claims
+Some airdrops reject claims (`revert: not eligible`) if invoked before a specific snapshot block height is reached.  
+* **Action:** Verify eligibility via `isEligible(address)` read calls before running the CLI.
+
+#### c. Claims Gated by Holding Another NFT
+If claiming requires the wallet to hold a specific access pass NFT and that NFT is also in the compromised wallet:  
+* **Action:** Secure the NFT first via `npm run rescue -- --mode nft` before executing token claims if ownership is checked at execution time.
+
+#### d. Cross-Chain Airdrops
+If claiming occurs on one chain (e.g. Ethereum) but tokens are credited on another (e.g. Arbitrum):  
+* **Action:** Flashbots bundles are strictly single-chain; they cannot be bridged atomically across networks. Run separate rescues on each respective network with appropriate RPCs and sponsor gas.
+
+#### e. Gas Spike Delta Between Simulation and Execution
+If there is a significant delay between `--dry-run` simulation and actual execution (e.g. waiting for an unlock timestamp):  
+* **Action:** Base fees may spike dramatically. Always re-simulate `--dry-run` 10–30 seconds before real execution, and maintain a 20–30% native gas buffer in the sponsor wallet.
+
+#### f. Core Technical Invariants
+1. **Blacklist / Compliance Freeze (USDT, USDC):** If the victim address is frozen on-chain by the token issuer, `transfer()` will unconditionally revert.
+2. **Paused Smart Contracts:** If functions are globally halted by administrators (`whenNotPaused`), simulation will fail.
+3. **Honeypot / Extreme Tax Tokens:** Predatory contracts with excessive transfer taxes or restricted transfers will fail to reach the safe destination.
+4. **Assets Already Siphoned:** If the attacker has already transferred the funds prior to launch, confirmed transactions are immutable.
+
+---
+
+### 6. Summary & Recommendations
+
+* **Instant Assets:** Run `claim`, `nft`, or `native` mode for clean, one-shot block execution.
+* **Deterministic Unlock (Lock/Cooldown):** Set reminders, re-simulate right before the target block, and leverage multi-relay broadcasting to win the block race.
+* **Third-Party Contingent (Dev Flag):** Use automated monitoring (`listen`) on a stable local PC.
+* **Compromised Approvals:** Always audit allowances on [Revoke.cash](https://revoke.cash) before executing any recovery flow.
 
 ---
 

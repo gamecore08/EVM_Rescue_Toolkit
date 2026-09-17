@@ -126,6 +126,26 @@ flowchart LR
 
 ---
 
+## ⏳ 4. Skenario Aset Terikat Waktu & Batasan Toolkit
+
+Toolkit ini dirancang optimal untuk aksi penyelamatan **instan 1-blok** (Klaim $\rightarrow$ Transfer ke Safe Wallet). Jika aset Anda memiliki masa tunggu (vesting, lock timestamp, delay cooldown unstaking, atau transfer token belum dibuka oleh developer), pahami matriks taktis berikut sebelum bertindak:
+
+| Skenario | Bisa Eksekusi Sekarang? | Strategi Penyelamatan | Mode Toolkit |
+| :--- | :---: | :--- | :--- |
+| **Airdrop Siap Klaim** (Tanpa gas) | ✅ **Langsung** | Bundle atomik 1x jalan (Sponsor + Klaim + Transfer ke Safe Wallet) | `npm run rescue -- --mode claim` |
+| **Airdrop Non-Transferable** (Nunggu Dev) | ❌ **Tunggu Dev** | Pantau state kontrak (`transfersEnabled`), eksekusi instan saat dibuka | Modifikasi `npm run rescue -- --mode listen` |
+| **Token Locked / Vesting** (Waktu Pasti) | ⏳ **Tepat Waktu** | Hitung mundur block timestamp, tembak bundle + multi-relay broadcast | `npm run rescue -- --mode claim` (Target: Kontrak Lock) |
+| **Unstaking Cooldown** (Delay 7–21 Hari) | ⏳ **2 Tahap Terpisah** | **2x eksekusi manual terpisah**: Tahap 1 ajukan unstake sekarang, Tahap 2 tarik & sweep setelah cooldown selesai | `npm run rescue -- --mode claim` (2x beda waktu) |
+| **Malicious Allowance Aktif** | ⚠️ **Bahaya** | Wajib cabut (*revoke*) approval jahat sebelum/dalam bundle penyelamatan | Revoke + Transfer |
+
+> [!WARNING]
+> **PERINGATAN KRUSIAL: Malicious Allowance (Persetujuan Jahat) adalah Risiko Aktif!**  
+> Skenario ini berbeda dari kasus menunggu biasa: jika wallet Anda pernah menandatangani `approve()` atau `setApprovalForAll()` ke kontrak drainer, attacker dapat menarik token Anda seketika via `transferFrom()` tanpa memantau mempool. Anda **wajib** memeriksa dan mencabut izin tersebut (via [Revoke.cash](https://revoke.cash)) sebelum menyelamatkan aset.
+
+> 📖 **Pelajari panduan taktis lengkap, mitigasi race condition, dan cara menangani 6 skenario rumit lainnya di [Dokumentasi Lengkap FAQ & Threat Model (Bahasa Indonesia)](docs/PANDUAN_ID.md#faq-threat-model-time-locked) atau [Full Guide (English)](docs/GUIDE_EN.md#faq-threat-model-time-locked).**
+
+---
+
 ## ⚡ Quick Start (Cara Cepat Menjalankan)
 
 ```bash
