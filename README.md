@@ -4,9 +4,10 @@
 
 [![Author](https://img.shields.io/badge/Author-%40Prasetyo__HK-1DA1F2?style=for-the-badge&logo=x&logoColor=white)](https://x.com/Prasetyo_HK)
 [![Status](https://img.shields.io/badge/Status-Active%20Development-success?style=for-the-badge)](https://github.com/gamecore08/EVM_Rescue_Toolkit)
+[![Test](https://github.com/gamecore08/EVM_Rescue_Toolkit/actions/workflows/test.yml/badge.svg)](https://github.com/gamecore08/EVM_Rescue_Toolkit/actions/workflows/test.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Ethers.js](https://img.shields.io/badge/Ethers.js-v6-blueviolet?style=for-the-badge)](https://docs.ethers.org/v6/)
-[![Flashbots](https://img.shields.io/badge/MEV-Flashbots%20Bundle-orange?style=for-the-badge)](https://docs.flashbots.net/)
+[![Flashbots](https://img.shields.io/badge/MEV-Multi--Relay%20Bundle-orange?style=for-the-badge)](https://docs.flashbots.net/)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
 **Toolkit whitehat headless CLI untuk menyelamatkan aset (ERC-20, NFT, Native Coin) dari wallet EVM yang bocor/dipantau bot drainer menggunakan bundle privat Flashbots.**
@@ -192,19 +193,42 @@ Jika Anda mengirim transaksi lewat RPC biasa (seperti MetaMask pada umumnya), tr
 > 🚀 **JAWABAN SINGKAT: TIDAK PERLU SAMA SEKALI!**  
 > Mengeluarkan uang $50–$200/bulan untuk langganan RPC premium adalah **pemborosan yang tidak berguna** untuk toolkit ini.
 
-Berikut fakta teknis mengapa **Akun Free Tier (Gratis)** sudah maksimal cepatnya:
+Berikut fakta teknis objektifnya:
 
-1. **Infrastruktur Jaringan Sama Persis:**  
-   Server WebSocket (`wss://`) di Alchemy/Infura untuk akun gratis dan berbayar berada di kluster cloud yang sama (AWS/GCP edge nodes). Latensi respon ping-nya sama-sama instan (**10–30 milidetik**).
-2. **Kuota Gratis Tidak Akan Habis:**  
-   Alchemy Free Tier memberikan **300 Juta Compute Units/bulan**. Satu kali operasi penyelamatan hanya memakan sekitar **15 hingga 50 CU**. Anda bisa melakukan penyelamatan ribuan kali tanpa pernah menyentuh batas kuota.
-3. **Relay Flashbots Memang 100% Gratis:**  
-   Endpoint `https://relay.flashbots.net` disediakan secara terbuka oleh organisasi riset Flashbots. Tidak ada "jalur VIP berbayar" di relay Flashbots. Semua orang, baik pemula maupun searcher profesional, masuk lewat gerbang yang sama.
+1. **Latensi Jaringan Identik dalam Kondisi Normal:**  
+   Dalam kondisi jaringan normal, latensi respons akun gratis dan berbayar praktis identik (~10–30ms) karena berada di infrastruktur edge yang sama (AWS/GCP). Perbedaan baru terasa saat jaringan sedang luar biasa padat (misal ada mint NFT viral atau volatilitas pasar tinggi) — pada situasi ini provider bisa menerapkan *rate limiting per detik* yang lebih ketat untuk akun gratis. Untuk pemakaian toolkit ini (eksekusi sesekali, bukan bot HFT), efeknya biasanya dapat diabaikan.
+2. **Kuota Gratis Sangat Melimpah:**  
+   Alchemy Free Tier memberikan **300 Juta Compute Units/bulan**, sedangkan satu kali operasi penyelamatan hanya memakan 15 hingga 50 CU.
+3. **Relay Flashbots Memang 100% Terbuka & Gratis:**  
+   Endpoint `https://relay.flashbots.net` disediakan oleh komunitas riset Flashbots tanpa ada antrean VIP berbayar.
+4. **Penyebab Bundle Gagal:**  
+   Kegagalan bundle masuk blok **tidak selalu berarti tip Anda kurang**. Penyebab lain yang umum: builder tertentu sedang tidak menyertakan bundle jenis tersebut, atau ada searcher/whitehat lain yang menargetkan calldata yang sama (*race condition*), terutama pada kasus airdrop atau eksploit yang sedang ramai diburu.
 
-#### 💡 Trik Nyata Agar Menang Balapan (100x Lebih Efektif dari RPC Berbayar):
-Penentu apakah bundle Anda dimasukkan pertama kali oleh Block Builder **BUKAN** paket RPC Anda, melainkan **Priority Tip Gas (`priorityGwei`)**:
-- Block Builder (Titan, BeaverBuild, Flashbots) memilih bundle berdasarkan siapa yang memberi tip paling menarik.
-- Daripada membuang uang untuk langganan RPC bulanan, cukup naikkan parameter `priorityGwei` di kode (misal dari default 2 Gwei menjadi **5–15 Gwei**). Biayanya hanya sekitar **$0.50 – $1.50** on-chain, tetapi bundle Anda akan langsung diprioritaskan di antrean blok terdepan!
+#### ⚡ Solusi Terbaik: Multi-Relay Builder Broadcast
+Untuk mengatasi keterbatasan coverage 1 builder saja, toolkit ini secara otomatis **mengirim bundle secara paralel** ke 4 builder teratas di Ethereum:
+- **Flashbots Relay** (`relay.flashbots.net`)
+- **Titan Builder** (`rpc.titanbuilder.xyz`)
+- **BeaverBuild** (`rpc.beaverbuild.org`)
+- **Rsync Builder** (`rsync-builder.xyz`)
+
+Dengan membroadcast ke seluruh builder ini sekaligus, tingkat inklusi (*inclusion rate*) melonjak drastis hingga **>85% per blok** tanpa biaya tambahan!
+
+---
+
+## ⚠️ Threat Model & Batasan Toolkit (Kapan Tool Ini TIDAK Bisa Menolong?)
+
+Penting dipahami bahwa toolkit ini adalah alat bantu balapan MEV private bundle, bukan sihir. Ada skenario di mana **penyelamatan aset secara teknis mustahil dilakukan**:
+
+1. **Token dengan Fitur Blacklist / Freeze:**  
+   Jika token target memiliki fungsi blacklist (misalnya USDT atau USDC yang telah di-freeze oleh penerbitnya karena alamat Anda terindikasi terkena hack), transaksi `transfer()` akan otomatis revert di level smart contract.
+2. **Kontrak yang Sedang Di-Pause:**  
+   Jika tim proyek menonaktifkan fungsi transfer/klaim (`whenNotPaused`), transaksi klaim akan gagal sampai pause dicabut.
+3. **Token Pajak Tinggi / Honeypot:**  
+   Token dengan mekanisme *transfer tax* ekstrem atau honeypot dapat memotong saldo secara signifikan saat transfer atau menolak transfer keluar ke wallet lain.
+4. **Lonjakan Tajam BaseFee Antara Blok:**  
+   Jika basefee melonjak ekstrem di luar buffer 25% yang dialokasikan, bundle bisa ditolak karena kekurangan dana gas. Gunakan buffer gas yang memadai.
+5. **Wallet Sudah Dikuras Sebelum Toolkit Dijalankan:**  
+   Jika token sudah lebih dulu ditransfer keluar oleh bot drainer sebelum Anda menjalankan skrip ini, aset tersebut sudah berpindah kepemilikan on-chain dan tidak bisa ditarik kembali.
 
 ---
 

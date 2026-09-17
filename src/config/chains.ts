@@ -22,7 +22,8 @@ export interface ChainConfig {
   chainId: number;
   name: string;
   nativeSymbol: string;
-  flashbotsRelay: string | null; // null = tidak ada relay Flashbots resmi
+  flashbotsRelay: string | null; // Primary relay
+  flashbotsRelays: string[]; // Multi-relay endpoints for maximum block inclusion
   explorer: string;
 }
 
@@ -32,15 +33,22 @@ export const CHAINS: Record<number, ChainConfig> = {
     name: "Ethereum Mainnet",
     nativeSymbol: "ETH",
     flashbotsRelay: "https://relay.flashbots.net",
+    flashbotsRelays: [
+      "https://relay.flashbots.net",
+      "https://rpc.titanbuilder.xyz",
+      "https://rpc.beaverbuild.org",
+      "https://rsync-builder.xyz",
+    ],
     explorer: "https://etherscan.io",
   },
   11155111: {
     chainId: 11155111,
     name: "Sepolia Testnet",
     nativeSymbol: "ETH",
-    // Flashbots juga menyediakan relay testnet untuk dry-run TANPA risiko uang riil.
-    // Gunakan chain ini dulu untuk berlatih sebelum ke mainnet.
     flashbotsRelay: "https://relay-sepolia.flashbots.net",
+    flashbotsRelays: [
+      "https://relay-sepolia.flashbots.net",
+    ],
     explorer: "https://sepolia.etherscan.io",
   },
   137: {
@@ -48,6 +56,7 @@ export const CHAINS: Record<number, ChainConfig> = {
     name: "Polygon",
     nativeSymbol: "MATIC",
     flashbotsRelay: null, // isi manual dengan private RPC provider pilihanmu
+    flashbotsRelays: [],
     explorer: "https://polygonscan.com",
   },
   56: {
@@ -55,6 +64,7 @@ export const CHAINS: Record<number, ChainConfig> = {
     name: "BNB Smart Chain",
     nativeSymbol: "BNB",
     flashbotsRelay: null, // isi manual, mis. endpoint 48club
+    flashbotsRelays: [],
     explorer: "https://bscscan.com",
   },
   42161: {
@@ -62,6 +72,7 @@ export const CHAINS: Record<number, ChainConfig> = {
     name: "Arbitrum One",
     nativeSymbol: "ETH",
     flashbotsRelay: null,
+    flashbotsRelays: [],
     explorer: "https://arbiscan.io",
   },
   8453: {
@@ -69,6 +80,7 @@ export const CHAINS: Record<number, ChainConfig> = {
     name: "Base",
     nativeSymbol: "ETH",
     flashbotsRelay: "https://rpc.flashbots.net/fast", // cek dokumentasi terbaru Base+Flashbots
+    flashbotsRelays: ["https://rpc.flashbots.net/fast"],
     explorer: "https://basescan.org",
   },
 };

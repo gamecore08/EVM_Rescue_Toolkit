@@ -87,7 +87,6 @@ export async function runClaimMode(params: ClaimModeParams) {
   const sponsorWallet = new ethers.Wallet(sponsorPrivateKey, provider);
   const authSigner = new ethers.Wallet(authSignerKey, provider);
 
-  const fbProvider = await FlashbotsBundleProvider.create(provider, authSigner, flashbotsRelayUrl);
 
   const hasClaimStep = !!claimContractAddress && !!claimCalldata;
 
@@ -178,6 +177,15 @@ export async function runClaimMode(params: ClaimModeParams) {
   });
   bundle.push({ signer: compromisedWallet, transaction: transferTx });
 
+  // Setup multi-relay endpoints (Flashbots + Titan + BeaverBuild + Rsync)
+  const relayUrls = chainCfg.flashbotsRelays.length > 0 ? chainCfg.flashbotsRelays : [flashbotsRelayUrl];
+  console.log(`[claim] Target Relay Builders (${relayUrls.length}): ${relayUrls.join(", ")}`);
+
+  const relayProviders = await Promise.all(
+    relayUrls.map((url) => FlashbotsBundleProvider.create(provider, authSigner, url))
+  );
+  const fbProvider = relayProviders[0];
+
   const currentBlock = await provider.getBlockNumber();
 
   if (dryRun) {
@@ -203,20 +211,33 @@ export async function runClaimMode(params: ClaimModeParams) {
       console.error(`[claim] Simulasi gagal di block ${targetBlock}:`, simulation.error.message);
       continue;
     }
-    console.log(`[claim] Simulasi sukses untuk block ${targetBlock}. Mengirim bundle...`);
+    console.log(`[claim] Simulasi sukses untuk block ${targetBlock}. Mengirim bundle ke ${relayProviders.length} builder...`);
 
-    const submission = await fbProvider.sendRawBundle(signedBundle, targetBlock);
-    if ("error" in submission) {
-      console.error(`[claim] Gagal kirim bundle:`, submission.error.message);
-      continue;
-    }
+    // Broadcast paralel ke seluruh builder/relay
+    const submissions = await Promise.allSettled(
+      relayProviders.map(async (rp, idx) => {
+        const sub = await rp.sendRawBundle(signedBundle, targetBlock);
+        if ("error" in sub) {
+          console.warn(`[relay] ⚠️ ${relayUrls[idx]} menolak: ${sub.error.message}`);
+          return null;
+        }
+        console.log(`[relay] ✅ ${relayUrls[idx]} menerima bundle!`);
+        return sub;
+      })
+    );
 
-    const resolution = await submission.wait();
-    if (resolution === 0 /* BundleIncluded */) {
-      console.log(`[claim] BERHASIL! Bundle masuk di block ${targetBlock}.`);
-      return { success: true, block: targetBlock };
+    const primarySub = submissions[0].status === "fulfilled" ? submissions[0].value : null;
+    if (primarySub) {
+      const resolution = await primarySub.wait();
+      if (resolution === 0 /* BundleIncluded */) {
+        console.log(`[claim] BERHASIL! Bundle masuk di block ${targetBlock}.`);
+        return { success: true, block: targetBlock };
+      } else {
+        console.log(`[claim] Belum masuk di block ${targetBlock}, coba block berikutnya...`);
+      }
     } else {
-      console.log(`[claim] Belum masuk di block ${targetBlock}, coba block berikutnya...`);
+      console.log(`[claim] Menunggu konfirmasi block ${targetBlock}...`);
+      await new Promise((r) => setTimeout(r, 12000));
     }
   }
 

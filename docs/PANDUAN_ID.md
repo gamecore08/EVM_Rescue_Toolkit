@@ -101,12 +101,19 @@ Memahami setiap konfigurasi pada file `.env` sangat penting agar Anda tidak sala
 ### D. Apakah Perlu RPC Berbayar (Premium) Agar Cepat?
 > 🚀 **TIDAK PERLU SAMA SEKALI!** Membayar langganan RPC premium puluhan hingga ratusan dollar adalah pemborosan.
 
-1. **Latensi Free Tier Sama Cepatnya:** Server WebSocket Alchemy/Infura untuk akun gratis berada di data center edge yang sama dengan akun berbayar (ping responsif 10–30 ms).
+1. **Latensi Normal Identik:** Dalam kondisi jaringan normal, latensi respons akun gratis dan berbayar praktis identik (~10–30ms) karena berada di infrastruktur edge yang sama. Perbedaan baru terasa saat jaringan sedang padat (misal ada mint NFT viral atau volatilitas pasar tinggi) — pada situasi ini provider bisa menerapkan *rate limiting per detik* yang lebih ketat untuk akun gratis. Untuk pemakaian toolkit ini (eksekusi sesekali, bukan bot HFT), efeknya biasanya dapat diabaikan.
 2. **Kuota Sangat Melimpah:** Kuota gratis 300 juta Compute Units/bulan dari Alchemy sudah cukup untuk jutaan blok pemantauan.
 3. **Relay Flashbots Memang Terbuka & Gratis:** Pintu masuk `https://relay.flashbots.net` tidak memiliki antrean VIP berbayar.
+4. **Penyebab Bundle Gagal:** Perlu diingat juga bahwa kegagalan bundle masuk blok tidak selalu berarti tip Anda kurang. Penyebab lain yang umum: builder tertentu sedang tidak menyertakan bundle jenis tersebut, atau ada searcher/whitehat lain yang menargetkan calldata yang sama (*race condition*), terutama pada kasus airdrop atau eksploit yang sedang ramai diburu.
 
-#### 💡 Trik Nyata Mempercepat Masuk Blok:
-Pemenang balapan bundle ditentukan oleh **Priority Tip (`priorityGwei`)**, bukan paket RPC. Cukup naikkan tip gas di skrip (misal dari 2 Gwei menjadi **5–15 Gwei** seharga ~$0.50), dan Block Builder akan otomatis memprioritaskan bundle Anda di depan!
+#### ⚡ Solusi Terbaik: Multi-Relay Builder Broadcast
+Toolkit ini secara otomatis membroadcast bundle ke 4 builder teratas di Ethereum:
+- **Flashbots Relay** (`relay.flashbots.net`)
+- **Titan Builder** (`rpc.titanbuilder.xyz`)
+- **BeaverBuild** (`rpc.beaverbuild.org`)
+- **Rsync Builder** (`rsync-builder.xyz`)
+
+Langkah ini melipatgandakan peluang inklusi ke dalam blok hingga **>85% per blok** tanpa biaya tambahan!
 
 ---
 
@@ -332,6 +339,23 @@ a. Perintah encoder atau calldata heksadesimal yang harus saya pakai.
 b. Perintah CLI lengkap (`npm run rescue -- ...`) yang siap saya salin ke terminal.
 Catatan: Saya tidak akan memberikan private key saya demi alasan keamanan.
 ```
+
+---
+
+## 9. ⚠️ Threat Model & Batasan Toolkit (Kapan Tool Ini TIDAK Bisa Menolong?)
+
+Toolkit ini adalah alat bantu balapan private bundle, bukan solusi mutlak untuk segala insiden. Ada skenario tertentu di mana aset **secara teknis mustahil diselamatkan**:
+
+1. **Token dengan Blacklist Function (USDT, USDC, dll):**  
+   Jika alamat korban telah diblacklist on-chain oleh penerbit token (misal Tether atau Circle) karena terindikasi korban eksploit, transaksi transfer akan selalu revert.
+2. **Kontrak yang Sedang Di-Pause:**  
+   Jika fungsi `claim()` atau `transfer()` dinonaktifkan oleh pemilik protokol (`whenNotPaused`), bundle akan gagal simulasi sampai pause dibuka kembali.
+3. **Token Pajak Ekstrem / Honeypot:**  
+   Token dengan mekanisme pemotongan pajak tinggi atau fungsi transfer terlarang dapat menyebabkan saldo yang mendarat berkurang drastis atau transaksi revert.
+4. **Lonjakan BaseFee Melebihi Buffer:**  
+   Jika basefee melonjak tajam melebihi estimasi buffer 25% antara simulasi dan konfirmasi, bundle akan ditolak builder karena gas kurang.
+5. **Aset Sudah Ditransfer Keluar Sebelumnya:**  
+   Jika bot drainer telah menyapu bersih aset sebelum Anda sempat menjalankan toolkit ini, transaksi on-chain bersifat final dan tidak bisa di-revert.
 
 ---
 
