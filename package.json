@@ -1,0 +1,44 @@
+{
+  "name": "evm-rescue-toolkit",
+  "version": "0.2.0",
+  "description": "Toolkit whitehat untuk menyelamatkan aset dari wallet EVM yang bocor/ter-drain, via Flashbots bundle (sponsor gas + claim/transfer dalam satu bundle atomik).",
+  "license": "MIT",
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "rescue": "ts-node src/index.ts",
+    "rescue:build": "node dist/index.js",
+    "encode": "ts-node src/utils/encoder.ts",
+    "compile": "hardhat compile",
+    "deploy": "hardhat run scripts/deploy.ts",
+    "test": "hardhat test"
+  },
+  "dependencies": {
+    "@flashbots/ethers-provider-bundle": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.2",
+    "inquirer": "^8.2.6",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",
+    "@nomicfoundation/hardhat-ethers": "^3.1.3",
+    "@nomicfoundation/hardhat-network-helpers": "^1.1.2",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.1.3",
+    "@typechain/ethers-v6": "^0.5.1",
+    "@typechain/hardhat": "^9.1.0",
+    "@types/chai": "^4.3.20",
+    "@types/inquirer": "^8.2.10",
+    "@types/mocha": "^10.0.7",
+    "@types/node": "^20.14.9",
+    "@types/yargs": "^17.0.32",
+    "chai": "^4.4.1",
+    "hardhat": "^2.22.6",
+    "hardhat-gas-reporter": "^1.0.10",
+    "solidity-coverage": "^0.8.17",
+    "ts-node": "^10.9.2",
+    "typechain": "^8.3.2",
+    "typescript": "^5.5.3"
+  }
+}
