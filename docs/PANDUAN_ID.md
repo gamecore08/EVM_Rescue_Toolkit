@@ -222,7 +222,33 @@ Sebelum menyentuh dana asli di mainnet:
 | Simulasi gagal "insufficient funds" | Sponsor wallet kurang saldo | Pastikan sponsor wallet memiliki saldo gas native yang cukup (minimal 0.02 - 0.05 ETH/BNB) |
 | Transfer sukses tapi jumlah 0 | Lupa isi `--amount` di mode claim | Gunakan `--amount <jumlah>` atau kontrak `Rescuer.sol` jika jumlah dinamis |
 | `claim()` revert terus | `msg.sender` tidak sesuai atau caller salah | Pastikan tidak memanggil via proxy kontrak perantara; gunakan EOA langsung atau pola Rescuer v2 |
-| WebSocket disconnect di mode `listen` | RPC node menutup koneksi websocket | Gunakan RPC WebSocket premium (Alchemy, Infura, QuickNode) |
+## 8. Panduan Pemula: Minta Bimbingan AI Agent (Gemini / Claude / ChatGPT)
+
+Bagi pengguna non-teknis atau pemula yang baru pertama kali menghadapi insiden wallet bocor:
+Jika Anda bingung menentukan function signature, menyusun calldata klaim, atau memilih mode penyelamatan yang tepat, Anda dapat meminta bimbingan interaktif kepada **Agent AI (seperti Google Gemini, Anthropic Claude, atau ChatGPT)**.
+
+> 🔴 **PERINGATAN KERAS KEAMANAN:**  
+> **JANGAN PERNAH menempelkan Private Key asli Anda ke dalam chat AI mana pun!**  
+> AI TIDAK membutuhkan private key Anda untuk membantu membuat calldata atau perintah CLI. Cukup gunakan placeholder seperti `0x1111...1111` atau nama simbolik.
+
+### 📋 Template Pertanyaan untuk AI Agent:
+
+Salin teks berikut dan berikan ke AI Anda:
+
+```text
+Halo, wallet EVM saya bocor dan saya sedang menggunakan repositori whitehat "EVM Rescue Toolkit" (berbasis Flashbots bundle).
+Tolong pandu saya langkah demi langkah secara ramah pemula untuk kasus berikut:
+
+1. Jenis Aset: [Sebutkan: Token ERC-20 / NFT ERC-721 / Saldo Native ETH / BNB]
+2. Alamat Kontrak Token/NFT: [Tempel alamat kontrak target]
+3. Skenario: [Contoh: Mau klaim staking reward dari smart contract / Menunggu airdrop unlock]
+4. Nama Fungsi di Explorer: [Contoh: claim() / withdraw() / unstake(uint256)]
+
+Tolong berikan:
+a. Perintah encoder atau calldata heksadesimal yang harus saya pakai.
+b. Perintah CLI lengkap (`npm run rescue -- ...`) yang siap saya salin ke terminal.
+Catatan: Saya tidak akan memberikan private key saya demi alasan keamanan.
+```
 
 ---
 

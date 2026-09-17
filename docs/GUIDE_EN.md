@@ -203,8 +203,33 @@ npm run deploy -- --network sepolia
 | Bundle never gets included | Priority gas too low | Raise `priorityGwei` in `planGas()` or increase builder tip |
 | Simulation fails "insufficient funds" | Sponsor wallet underfunded | Ensure sponsor wallet has sufficient native balance (e.g. 0.02 - 0.05 ETH/BNB) |
 | Transfer succeeds but amount is 0 | Forgot `--amount` in claim mode | Pass `--amount <value>` or use `Rescuer.sol` for dynamic balances |
-| `claim()` keeps reverting | `msg.sender` mismatch in claim contract | Ensure direct EOA call instead of an intermediary contract proxy |
-| WebSocket disconnects in `listen` mode | Public RPC timed out / rate limited | Use dedicated WebSocket providers like Alchemy, Infura, or QuickNode |
+## 7. Beginner's AI Copilot Guide (Gemini / Claude / ChatGPT)
+
+If you are new to Web3 smart contract interactions or under intense pressure during an exploit:
+You can ask an **AI Agent (Google Gemini, Claude, or ChatGPT)** to guide you step-by-step through parameter construction and calldata generation.
+
+> 🔴 **CRITICAL SECURITY WARNING:**  
+> **NEVER PASTE YOUR REAL PRIVATE KEYS INTO ANY AI CHAT!**  
+> AI only needs contract addresses, function signatures, and chain IDs to assist you. Always replace private keys with mock values like `0x1111...1111`.
+
+### 📋 Prompt Template for AI Assistants:
+
+Copy and paste this prompt to your AI:
+
+```text
+Hello, my EVM wallet was compromised and I am using the open-source "EVM Rescue Toolkit" (powered by Flashbots atomic private bundles).
+Please guide me step-by-step for my specific scenario:
+
+1. Asset Type: [e.g. ERC-20 Token / ERC-721 NFT / Native ETH or BNB]
+2. Network: [e.g. Ethereum Mainnet / Base / Arbitrum / BSC / Sepolia]
+3. Scenario: [e.g. Need to claim staking rewards from a smart contract / Awaiting token unlock]
+4. Contract Function Name: [e.g. claim() / unstake(uint256)]
+
+Please provide:
+a. The interactive encoder settings or hexadecimal calldata I need to use.
+b. The exact CLI command (`npm run rescue -- ...`) to execute in my terminal.
+Note: I will NOT share my private keys with you for security reasons.
+```
 
 ---
 

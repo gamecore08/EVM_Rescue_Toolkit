@@ -1,18 +1,56 @@
-# 🛡️ evm-rescue-toolkit
+# 🛡️ EVM Rescue Toolkit
 
-`Author:` [@Prasetyo_HK](https://x.com/Prasetyo_HK) • `Status:` Active Development
+<div align="center">
 
-Toolkit whitehat untuk menyelamatkan aset dari **wallet EVM sendiri yang bocor** (private key ter-expose / dipantau drainer bot), menggunakan **Flashbots bundle**: gas disponsori dan transaksi klaim/transfer dikirim sebagai satu paket atomik lewat jalur privat — tidak lewat mempool publik — sehingga drainer bot yang memantau alamatmu **tidak sempat mendahului**.
+[![Author](https://img.shields.io/badge/Author-%40Prasetyo__HK-1DA1F2?style=for-the-badge&logo=x&logoColor=white)](https://x.com/Prasetyo_HK)
+[![Status](https://img.shields.io/badge/Status-Active%20Development-success?style=for-the-badge)](https://github.com/gamecore08/EVM_Rescue_Toolkit)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Ethers.js](https://img.shields.io/badge/Ethers.js-v6-blueviolet?style=for-the-badge)](https://docs.ethers.org/v6/)
+[![Flashbots](https://img.shields.io/badge/MEV-Flashbots%20Bundle-orange?style=for-the-badge)](https://docs.flashbots.net/)
+[![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-Referensi resmi yang dipakai sebagai dasar: [flashbots/searcher-sponsored-tx](https://github.com/flashbots/searcher-sponsored-tx) & [Flashbots Quick Start](https://docs.flashbots.net/flashbots-auction/quick-start).
+**Toolkit whitehat headless CLI untuk menyelamatkan aset (ERC-20, NFT, Native Coin) dari wallet EVM yang bocor/dipantau bot drainer menggunakan bundle privat Flashbots.**
 
-📘 **Panduan lengkap**: [docs/PANDUAN_ID.md](docs/PANDUAN_ID.md) (Bahasa Indonesia) · [docs/GUIDE_EN.md](docs/GUIDE_EN.md) (English)
+*Headless whitehat CLI toolkit to recover assets from compromised EVM wallets via atomic Flashbots private bundles.*
 
-> ⚠️ **Hanya untuk wallet milik sendiri.** Toolkit ini dirancang untuk skenario "kunci saya bocor, saya balapan dengan bot untuk selamatkan sisa aset saya sendiri". Jangan dipakai terhadap wallet orang lain.
+[📘 Panduan Lengkap (Bahasa Indonesia)](docs/PANDUAN_ID.md) • [📘 Full Technical Guide (English)](docs/GUIDE_EN.md) • [☕ Support & Donations](#-support--donations)
+
+</div>
 
 ---
 
-## 🔄 Alur Penyelamatan Flashbots Bundle
+## 🖥️ Terminal Preview (Headless CLI in Action)
+
+Toolkit ini berjalan 100% headless di Terminal CLI tanpa GUI browser untuk menjamin kecepatan eksekusi dan keamanan private key tanpa risiko sniffing dari browser extensions:
+
+```text
+┌────────────────────────────────────────────────────────────────────────────────┐
+│  🛡️  EVM RESCUE TOOLKIT v0.2.0 - Headless Whitehat Recovery Terminal          │
+├────────────────────────────────────────────────────────────────────────────────┤
+│  [init] Network          : Ethereum Mainnet (Chain ID: 1)                      │
+│  [init] Sponsor Wallet   : 0x8920...3F41 (Clean Funding EOA)                   │
+│  [init] Compromised EOA  : 0x3A21...B89C (Compromised Wallet holding Assets)   │
+│  [init] Safe Destination : 0x90A1...771B (Fresh Secure Cold Storage)           │
+│                                                                                │
+│  [plan] Gas Strategy     : EIP-1559 BaseFee: 24 Gwei | PriorityTip: 3 Gwei     │
+│  [plan] Packaging 3-Tx Atomic Bundle (Direct to Block Builders)...             │
+│         Tx 1: Sponsor funds exact native gas -> Compromised EOA               │
+│         Tx 2: Compromised EOA calls claim() / unstake()                       │
+│         Tx 3: Compromised EOA transfers 10,000.00 TOKEN -> Safe Destination   │
+│                                                                                │
+│  [sim]  Running Flashbots simulate against block #20761284...                  │
+│  [sim]  Simulation Result : SUCCESS (Revert: False, Gas Used: 142,500)         │
+│  [send] Submitting Raw Bundle to Flashbots Relay (Bypassing Public Mempool)... │
+│  [conf] ✅ BUNDLE INCLUDED IN BLOCK #20761284!                                 │
+│  [done] 🎉 All assets successfully secured into safe destination!              │
+└────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔄 1. Bagan Alur Bundle Flashbots (Sequence Diagram)
+
+Transaksi pengiriman gas dan pemindahan aset dikemas menjadi **satu paket atomik (*all-or-nothing*)** yang dikirim langsung ke builder tanpa melalui mempool publik, sehingga bot drainer tidak memiliki kesempatan untuk mendahului (*front-run*):
 
 ```mermaid
 sequenceDiagram
@@ -40,104 +78,178 @@ sequenceDiagram
 
 ---
 
-## Pilih skenario kamu
+## 🌳 2. Pohon Keputusan (Decision Tree) Pemilihan Mode
 
-| Masalahmu | Mode | Contoh |
+Gunakan alur diagram ini untuk menentukan mode yang paling tepat untuk situasi Anda:
+
+```mermaid
+flowchart TD
+    Start([Aset Apa yang Ingin Diselamatkan?]) --> AssetType{Jenis Aset}
+
+    AssetType -->|Native Coin: ETH/BNB/MATIC| NativeCheck{Saldo Sudah Ada di Wallet?}
+    NativeCheck -->|Sudah Ada Sekarang| ModeNative["⚡ Mode: native<br/>One-shot direct sweep"]
+    NativeCheck -->|Belum Ada, Menunggu Masuk| ModeListenNat["🎧 Mode: listen<br/>--token 0x000...000"]
+
+    AssetType -->|NFT: ERC-721 / ERC-1155| NFTQty{Berapa Banyak NFT?}
+    NFTQty -->|1 Token / Satuan| ModeNFT["🖼️ Mode: nft<br/>--nft 0x... --tokenId 123"]
+    NFTQty -->|Banyak NFT Sekaligus| BatchNFT["📦 Rescuer.sol v2<br/>rescueERC721Batch"]
+
+    AssetType -->|Token ERC-20| ClaimNeeded{Perlu Panggil Fungsi Klaim Dulu?}
+    ClaimNeeded -->|Tidak, Token Cair Otomatis| ModeListen["🎧 Mode: listen<br/>--token 0xToken"]
+    ClaimNeeded -->|Ya, Butuh claim / unstake| DynamicBal{Jumlah Token Diketahui Pasti?}
+    DynamicBal -->|Ya, Jumlah Pasti| ModeClaim["🎯 Mode: claim<br/>--contract --calldata --amount"]
+    DynamicBal -->|Tidak, Reward Variabel| RescuerERC20["📦 Rescuer.sol v2<br/>balanceOf real-time + transferFrom"]
+```
+
+---
+
+## 💻 3. Rekomendasi Deployment: Local PC vs Cloud VPS
+
+Kapan harus menjalankan toolkit di PC lokal dan kapan menggunakan server VPS?
+
+```mermaid
+flowchart LR
+    ModeChoice{Mode Toolkit Apa?}
+    ModeChoice -->|claim / nft / native| LocalOnly["💻 WAJIB LOCAL PC<br/>Proses hanya hidup 1-2 menit.<br/>JANGAN taruh key di VPS!"]
+    ModeChoice -->|listen 24/7| UptimeChoice{Bisa Nyalakan PC Terus?}
+    UptimeChoice -->|Bisa| LocalWatch["💻 Local PC + Koneksi Kabel<br/>Paling aman & direkomendasikan"]
+    UptimeChoice -->|Tidak Bisa| VPSHardened["☁️ VPS Khusus & Terisolasi<br/>Wajib ikuti Checklist Keamanan!"]
+```
+
+| Mode | Rekomendasi | Alasan Keamanan |
 |---|---|---|
-| Staking/unstaking, takut hasilnya disweep saat unlock | `listen` | `npm run rescue -- --mode listen --token 0xToken...` |
-| Airdrop cair otomatis, takut keburu diambil bot | `listen` | `npm run rescue -- --mode listen --token 0xToken...` |
-| Airdrop/klaim manual (perlu panggil `claim()` dulu) | `claim` | `npm run rescue -- --mode claim --contract 0x... --calldata 0x... --token 0x... --amount 1000` |
-| Gas native coin (ETH/BNB/dst) yang mau diamankan sekarang | `native` | `npm run rescue -- --mode native` |
-| Gas native yang belum muncul, ditunggu | `listen` (token = address 0) | `npm run rescue -- --mode listen --token 0x000...000` |
-| NFT (ERC-721/1155) di wallet bocor | `nft` | `npm run rescue -- --mode nft --nft 0x... --tokenId 1234` |
+| `claim`, `nft`, `native` | **100% Local PC** | Eksekusi instan (1–2 menit). Menaruh private key di VPS untuk proses singkat adalah risiko yang tidak perlu. |
+| `listen` (Auto-sweep) | **Local PC** (Diutamakan) / **Hardened VPS** | Mode memantau 24/7. Jika memakai VPS, gunakan server baru dan terisolasi serta destroy segera setelah selesai. |
 
-> 💡 **Jalankan di Local atau VPS?** Baca panduan keamanan dan analisis risiko di [docs/PANDUAN_ID.md#3-local-pc-sendiri-vs-vps-analisis-keamanan--sisi-ga-enak-nya](docs/PANDUAN_ID.md). Mode `claim`/`nft`/`native` wajib dijalankan di Local PC!
-
+*Analisis lengkap risiko keamanan VPS tersedia di [docs/PANDUAN_ID.md](docs/PANDUAN_ID.md#3-local-pc-sendiri-vs-vps-analisis-keamanan--sisi-ga-enak-nya).*
 
 ---
 
-## Quick Start
+## ⚡ Quick Start (Cara Cepat Menjalankan)
 
 ```bash
-git clone <repo-ini>
-cd evm-rescue-toolkit
+# 1. Clone repository
+git clone https://github.com/gamecore08/EVM_Rescue_Toolkit.git
+cd EVM_Rescue_Toolkit
+
+# 2. Instal dependensi
 npm install
+
+# 3. Salin dan edit konfigurasi .env
 cp .env.example .env
-# isi semua field di .env sesuai kebutuhan (lihat komentar di dalamnya)
 ```
 
-**4 hal wajib di `.env`:**
-- `COMPROMISED_PRIVATE_KEY` — wallet yang bocor (yang mau diselamatkan)
-- `SPONSOR_PRIVATE_KEY` — wallet bersih untuk bayar semua gas
-- `SAFE_DESTINATION_ADDRESS` — wallet baru & aman, tujuan akhir dana
-- `FLASHBOTS_AUTH_SIGNER_KEY` — wallet kosong baru, khusus identitas ke relay
-
-**Selalu coba dulu di Sepolia testnet** (`CHAIN_ID=11155111`) sebelum ke mainnet — lihat panduan lengkap.
-
-**Tidak yakin sebelum broadcast beneran?** Tambahkan `--dry-run` di mode `claim` untuk simulasi tanpa mengirim apa pun.
+### 4 Variabel Wajib pada `.env`:
+1. `COMPROMISED_PRIVATE_KEY` : Private key wallet korban (yang bocor).
+2. `SPONSOR_PRIVATE_KEY` : Private key wallet bersih penyedia saldo gas.
+3. `SAFE_DESTINATION_ADDRESS` : Alamat wallet baru yang aman untuk menerima aset.
+4. `FLASHBOTS_AUTH_SIGNER_KEY` : Private key baru/kosong untuk reputasi Flashbots bundle relay.
 
 ---
 
-## Struktur Repo
-
-```
-evm-rescue-toolkit/
-├── contracts/
-│   ├── Rescuer.sol            # kontrak bantu v2: baca saldo real-time + batch rescue
-│   └── test/MockContracts.sol # mock token & staking untuk unit test
-├── scripts/
-│   └── deploy.ts              # deploy Rescuer.sol via Hardhat
-├── src/
-│   ├── modules/
-│   │   ├── flashbotsClaim.ts  # mode claim
-│   │   ├── passiveSweeper.ts  # mode listen
-│   │   ├── nftRescue.ts       # mode nft
-│   │   └── nativeSweeper.ts   # mode native
-│   ├── utils/
-│   │   ├── rawSigner.ts       # gas planning, signing, token meta
-│   │   └── encoder.ts         # CLI interaktif generate calldata klaim
-│   ├── config/chains.ts       # daftar chain, relay, testnet
-│   └── index.ts               # CLI terpadu
-├── docs/
-│   ├── PANDUAN_ID.md
-│   └── GUIDE_EN.md
-├── test/rescuer.test.ts       # unit test (npm test)
-├── hardhat.config.ts
-├── .env.example
-├── package.json
-└── tsconfig.json
-```
-
-## Perintah Penting
+## 🕹️ Daftar Perintah Utama
 
 ```bash
-npm run rescue -- --mode <claim|listen|nft|native> [flags...]  # jalankan rescue
-npm run encode                                                  # generate calldata klaim interaktif
-npm run compile                                                 # compile Rescuer.sol
-npm run deploy -- --network sepolia                             # deploy Rescuer.sol
-npm test                                                         # unit test (membuktikan bug v1 & fix v2)
+# 1. Calldata Generator Interaktif (Klaim Airdrop / Staking)
+npm run encode
+
+# 2. Mode Claim (Dengan Simulasi Dry-Run terlebih dahulu)
+npm run rescue -- --mode claim --contract 0x... --calldata 0x... --token 0x... --amount 1000 --dry-run
+
+# 3. Mode Claim (Eksekusi Nyata)
+npm run rescue -- --mode claim --contract 0x... --calldata 0x... --token 0x... --amount 1000
+
+# 4. Mode Listen (Memantau blok secara pasif hingga saldo token muncul)
+npm run rescue -- --mode listen --token 0xTokenAddress
+
+# 5. Mode NFT (ERC-721 / ERC-1155)
+npm run rescue -- --mode nft --nft 0xContract --tokenId 123 --standard erc721
+
+# 6. Mode Native (Sapu bersih saldo ETH/BNB/MATIC yang ada saat ini)
+npm run rescue -- --mode native
+
+# 7. Compile & Jalankan Unit Test Hardhat
+npm run compile
+npm test
 ```
 
-## Batasan & Disclaimer
+---
 
-- Ini **balapan (race)**, bukan jaminan menang.
-- Selalu **simulasikan dulu** (`--dry-run`, atau `fbProvider.simulate` otomatis di mode claim) sebelum broadcast nyata.
-- **Jangan pernah** taruh private key di kode/commit git — gunakan `.env` (sudah masuk `.gitignore`).
-- Audit `Rescuer.sol` sebelum dipakai untuk dana besar. Uji dulu di Sepolia.
+## 🤖 Panduan Pemula: Cara Minta Panduan Agent AI (Gemini / Claude / ChatGPT)
+
+Jika Anda pemula dan bingung mengonfigurasi parameter atau membaca fungsi smart contract, Anda dapat meminta bantuan Agent AI (**ChatGPT, Claude, atau Google Gemini**).
+
+> ⚠️ **PERINGATAN KEAMANAN TERBESAR:**  
+> **JANGAN PERNAH memasukkan Private Key asli Anda ke dalam chat AI mana pun!** Gantilah private key Anda dengan teks contoh seperti `0x1111...1111`.
+
+### 📋 Contoh Template Prompt untuk AI:
+
+Salin dan tempel prompt di bawah ini ke AI Anda:
+
+```text
+Halo, saya sedang menggunakan toolkit "EVM Rescue Toolkit" untuk menyelamatkan aset dari wallet saya yang private key-nya bocor.
+Saya ingin meminta panduan teknis langkah demi langkah untuk kasus saya:
+
+1. Jenis Aset: [Contoh: Token ERC-20 / NFT ERC-721 / Saldo Native ETH]
+2. Nama Jaringan: [Contoh: Ethereum Mainnet / Base / Arbitrum / BSC / Sepolia]
+3. Skenario: [Contoh: Saya ingin klaim airdrop dari kontrak 0xAbc... lalu langsung dipindahkan ke wallet aman saya]
+4. Nama Fungsi Klaim: [Contoh: claim() / unstake(amount)]
+
+Tolong bantu saya:
+a. Berikan calldata yang harus saya gunakan atau cara menjalankannya di toolkit.
+b. Tuliskan perintah CLI yang tepat untuk saya jalankan di terminal.
+Catatan: Saya TIDAK akan membagikan private key saya kepada Anda.
+```
+
+---
+
+## 📁 Struktur Repositori
+
+```text
+EVM_Rescue_Toolkit/
+├── contracts/
+│   ├── Rescuer.sol            # Kontrak v2 on-chain real-time balance rescue
+│   └── test/MockContracts.sol # Mock kontrak untuk pengujian unit test
+├── docs/
+│   ├── PANDUAN_ID.md          # Panduan lengkap Bahasa Indonesia
+│   └── GUIDE_EN.md            # Full Technical Guide English
+├── scripts/
+│   └── deploy.ts              # Script deploy Rescuer.sol via Hardhat
+├── src/
+│   ├── config/chains.ts       # Konfigurasi RPC & Flashbots relay
+│   ├── modules/
+│   │   ├── flashbotsClaim.ts  # Mode claim
+│   │   ├── passiveSweeper.ts  # Mode listen
+│   │   ├── nftRescue.ts       # Mode nft
+│   │   └── nativeSweeper.ts   # Mode native
+│   ├── utils/
+│   │   ├── rawSigner.ts       # Perhitungan gas EIP-1559 & builder tx
+│   │   └── encoder.ts         # CLI calldata generator interaktif
+│   └── index.ts               # CLI Entrypoint utama
+├── test/
+│   └── rescuer.test.ts        # Unit test Hardhat
+├── hardhat.config.ts          # Konfigurasi compiler Hardhat
+├── package.json               # Dependensi proyek (Ethers v6)
+└── tsconfig.json              # Konfigurasi TypeScript
+```
 
 ---
 
 ## ☕ Support & Donations
 
-Kalau toolkit ini membantu, kontribusi sangat dihargai:
+If this project helped you rescue your funds, contributions are greatly appreciated:
 
-- **EVM** *(ETH, Base, Arbitrum, BSC, Polygon)*: `0xFCDD187D32cFaecD8B07638BD6004fA2bF6838C6`
-- **Solana** *(SOL/SPL)*: `2zyBHgVYNp5WnKUK25WsdsQbsMzkj8Kzw2wDePWAnGZYS`
-- **Sui**: `0xfac84087048bf82f4f99c7704ee0cf9b1386c064b8ea845ab6baf65d1153eb09`
-- **Bitcoin**: `bc1qulgaaddxhl9qz5jcs4wu5tx5j3g9ng3lfd4cl0`
+- **EVM (Ethereum, Base, Arbitrum, BSC, Polygon):**  
+  `0xFCDD187D32cFaecD8B07638BD6004fA2bF6838C6`
+- **Solana (SOL & SPL Tokens):**  
+  `2zyBHgVYNp5WnKUK25WsdsQbsMzkj8Kzw2wDePWAnGZYS`
+- **Sui:**  
+  `0xfac84087048bf82f4f99c7704ee0cf9b1386c064b8ea845ab6baf65d1153eb09`
+- **Bitcoin (BTC):**  
+  `bc1qulgaaddxhl9qz5jcs4wu5tx5j3g9ng3lfd4cl0`
 
 ---
 
-## License
+## 📄 License
 
-MIT
+Distributed under the [MIT License](LICENSE).
