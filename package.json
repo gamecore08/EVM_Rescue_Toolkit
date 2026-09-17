@@ -11,6 +11,7 @@
     "encode": "ts-node src/utils/encoder.ts",
     "compile": "hardhat compile",
     "deploy": "hardhat run scripts/deploy.ts",
+    "testnet:setup": "hardhat run scripts/deployMockSepolia.ts --network sepolia",
     "test": "hardhat test"
   },
   "dependencies": {

@@ -196,7 +196,53 @@ npm run deploy -- --network sepolia
 
 ---
 
-## 6. Troubleshooting
+## 6. Safe Practice on Sepolia Testnet
+
+Before handling real funds on mainnet, **it is strongly recommended to practice on Sepolia Testnet**. Flashbots operates an official public Sepolia relay (`https://relay-sepolia.flashbots.net`), allowing you to test the entire atomic bundle flow at zero financial risk.
+
+### Step 1: Get Free Sepolia ETH
+Fund your clean **Sponsor Wallet** with a small amount of testnet ETH (0.05 ETH is plenty):
+- [Google Cloud Sepolia Faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia)
+- [Alchemy Sepolia Faucet](https://sepoliafaucet.com/)
+- [PoW Faucet Sepolia](https://sepolia-faucet.pk910.de/)
+
+### Step 2: Configure `.env` for Sepolia
+```env
+CHAIN_ID=11155111
+RPC_HTTP_URL=https://rpc.sepolia.org
+SEPOLIA_RPC_URL=https://rpc.sepolia.org
+FLASHBOTS_RELAY_URL=https://relay-sepolia.flashbots.net
+
+COMPROMISED_PRIVATE_KEY=0x... (Your mock compromised testing key)
+SPONSOR_PRIVATE_KEY=0x...     (Clean wallet holding Sepolia ETH)
+SAFE_DESTINATION_ADDRESS=0x... (Safe destination wallet to receive assets)
+FLASHBOTS_AUTH_SIGNER_KEY=0x... (Any random disposable key for relay identity)
+```
+
+### Step 3: Automated Mock Deployment on Sepolia
+Run this single command:
+```bash
+npm run testnet:setup
+```
+This automated script will:
+1. Deploy `MockToken` ($MRT) on Sepolia.
+2. Deploy the `MockStaking` claim contract on Sepolia.
+3. Register your victim address into an active stake position (starting balance = 0).
+4. Output the exact CLI command ready for you to copy and run!
+
+### Step 4: Execute Testnet Rescue
+```bash
+# 1. Simulate via dry-run first:
+npm run rescue -- --mode claim --contract <STAKING_ADDRESS> --calldata 0x4e71d92d --token <TOKEN_ADDRESS> --amount 1000 --dry-run
+
+# 2. Execute bundle on Sepolia:
+npm run rescue -- --mode claim --contract <STAKING_ADDRESS> --calldata 0x4e71d92d --token <TOKEN_ADDRESS> --amount 1000
+```
+Upon confirmation, check [Sepolia Etherscan](https://sepolia.etherscan.io) to see the 1,000 MRT tokens safely arrived in your `SAFE_DESTINATION_ADDRESS`!
+
+---
+
+## 7. Troubleshooting
 
 | Symptom | Likely Cause | Resolution |
 |---|---|---|

@@ -175,6 +175,52 @@ npm test
 
 ---
 
+## 🧪 Panduan Latihan & Simulasi Aman di Sepolia Testnet
+
+Sebelum menyentuh dana nyata di mainnet, **sangat disarankan berlatih terlebih dahulu di Sepolia Testnet**. Flashbots menyediakan relay publik khusus Sepolia sehingga Anda bisa menguji alur bundle tanpa mengeluarkan uang sepeser pun.
+
+### Langkah 1: Dapatkan Sepolia ETH Gratis
+Kirim sedikit Sepolia ETH (cukup 0.05 ETH) ke **Sponsor Wallet**:
+- [Google Cloud Sepolia Faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia)
+- [Alchemy Sepolia Faucet](https://sepoliafaucet.com/)
+- [PoW Faucet Sepolia](https://sepolia-faucet.pk910.de/)
+
+### Langkah 2: Konfigurasi `.env` untuk Sepolia
+```env
+CHAIN_ID=11155111
+RPC_HTTP_URL=https://rpc.sepolia.org
+SEPOLIA_RPC_URL=https://rpc.sepolia.org
+FLASHBOTS_RELAY_URL=https://relay-sepolia.flashbots.net
+
+COMPROMISED_PRIVATE_KEY=0x... (Private key wallet latihan yang berpura-pura bocor)
+SPONSOR_PRIVATE_KEY=0x...     (Private key wallet bersih yang berisi Sepolia ETH)
+SAFE_DESTINATION_ADDRESS=0x... (Alamat wallet aman penampung aset)
+FLASHBOTS_AUTH_SIGNER_KEY=0x... (Private key sembarang baru untuk reputasi relay)
+```
+
+### Langkah 3: Setup Kontrak Mock Otomatis di Sepolia
+Jalankan perintah ini:
+```bash
+npm run testnet:setup
+```
+Script ini akan:
+1. Men-deploy `MockToken` ($MRT) ke Sepolia.
+2. Men-deploy kontrak klaim `MockStaking` ke Sepolia.
+3. Mendaftarkan wallet korban ke posisi stake (saldo awal = 0).
+4. Menghasilkan perintah CLI lengkap yang siap Anda jalankan!
+
+### Langkah 4: Eksekusi Penyelamatan Latihan
+```bash
+# 1. Uji simulasi (dry-run) tanpa broadcast:
+npm run rescue -- --mode claim --contract <ALAMAT_STAKING> --calldata 0x4e71d92d --token <ALAMAT_TOKEN> --amount 1000 --dry-run
+
+# 2. Eksekusi nyata di Sepolia:
+npm run rescue -- --mode claim --contract <ALAMAT_STAKING> --calldata 0x4e71d92d --token <ALAMAT_TOKEN> --amount 1000
+```
+Setelah berhasil masuk ke dalam blok Sepolia, Anda dapat mengecek explorer Sepolia Etherscan bahwa 1000 MRT telah berhasil diselamatkan ke `SAFE_DESTINATION_ADDRESS`!
+
+---
+
 ## 🤖 Panduan Pemula: Cara Minta Panduan Agent AI (Gemini / Claude / ChatGPT)
 
 Jika Anda pemula dan bingung mengonfigurasi parameter atau membaca fungsi smart contract, Anda dapat meminta bantuan Agent AI (**ChatGPT, Claude, atau Google Gemini**).
