@@ -98,6 +98,16 @@ Memahami setiap konfigurasi pada file `.env` sangat penting agar Anda tidak sala
 3. `SAFE_DESTINATION_ADDRESS`: Alamat publik (`0x...`) wallet aman baru tempat aset dikirimkan.
 4. `FLASHBOTS_AUTH_SIGNER_KEY`: Kunci privat wallet acak baru (boleh saldo 0). Hanya digunakan Flashbots sebagai identitas kriptografis untuk mencegah spam serangan DoS ke relay.
 
+### D. Apakah Perlu RPC Berbayar (Premium) Agar Cepat?
+> 🚀 **TIDAK PERLU SAMA SEKALI!** Membayar langganan RPC premium puluhan hingga ratusan dollar adalah pemborosan.
+
+1. **Latensi Free Tier Sama Cepatnya:** Server WebSocket Alchemy/Infura untuk akun gratis berada di data center edge yang sama dengan akun berbayar (ping responsif 10–30 ms).
+2. **Kuota Sangat Melimpah:** Kuota gratis 300 juta Compute Units/bulan dari Alchemy sudah cukup untuk jutaan blok pemantauan.
+3. **Relay Flashbots Memang Terbuka & Gratis:** Pintu masuk `https://relay.flashbots.net` tidak memiliki antrean VIP berbayar.
+
+#### 💡 Trik Nyata Mempercepat Masuk Blok:
+Pemenang balapan bundle ditentukan oleh **Priority Tip (`priorityGwei`)**, bukan paket RPC. Cukup naikkan tip gas di skrip (misal dari 2 Gwei menjadi **5–15 Gwei** seharga ~$0.50), dan Block Builder akan otomatis memprioritaskan bundle Anda di depan!
+
 ---
 
 ## 4. Local (PC Sendiri) vs VPS: Analisis Keamanan & Sisi "Ga Enak"-nya

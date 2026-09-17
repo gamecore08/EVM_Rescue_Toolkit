@@ -187,6 +187,25 @@ Jika Anda mengirim transaksi lewat RPC biasa (seperti MetaMask pada umumnya), tr
 - `SAFE_DESTINATION_ADDRESS`: Alamat publik (`0x...`) wallet dingin penampung aset yang aman.
 - `FLASHBOTS_AUTH_SIGNER_KEY`: Private key wallet sembarang baru (boleh kosong melompong tanpa saldo). Kunci ini hanya digunakan relay Flashbots sebagai "tanda tangan identitas" untuk mengukur reputasi bundle dan mencegah serangan DoS.
 
+### 5. Apakah Perlu RPC Berbayar (Premium) Agar Cepat?
+
+> 🚀 **JAWABAN SINGKAT: TIDAK PERLU SAMA SEKALI!**  
+> Mengeluarkan uang $50–$200/bulan untuk langganan RPC premium adalah **pemborosan yang tidak berguna** untuk toolkit ini.
+
+Berikut fakta teknis mengapa **Akun Free Tier (Gratis)** sudah maksimal cepatnya:
+
+1. **Infrastruktur Jaringan Sama Persis:**  
+   Server WebSocket (`wss://`) di Alchemy/Infura untuk akun gratis dan berbayar berada di kluster cloud yang sama (AWS/GCP edge nodes). Latensi respon ping-nya sama-sama instan (**10–30 milidetik**).
+2. **Kuota Gratis Tidak Akan Habis:**  
+   Alchemy Free Tier memberikan **300 Juta Compute Units/bulan**. Satu kali operasi penyelamatan hanya memakan sekitar **15 hingga 50 CU**. Anda bisa melakukan penyelamatan ribuan kali tanpa pernah menyentuh batas kuota.
+3. **Relay Flashbots Memang 100% Gratis:**  
+   Endpoint `https://relay.flashbots.net` disediakan secara terbuka oleh organisasi riset Flashbots. Tidak ada "jalur VIP berbayar" di relay Flashbots. Semua orang, baik pemula maupun searcher profesional, masuk lewat gerbang yang sama.
+
+#### 💡 Trik Nyata Agar Menang Balapan (100x Lebih Efektif dari RPC Berbayar):
+Penentu apakah bundle Anda dimasukkan pertama kali oleh Block Builder **BUKAN** paket RPC Anda, melainkan **Priority Tip Gas (`priorityGwei`)**:
+- Block Builder (Titan, BeaverBuild, Flashbots) memilih bundle berdasarkan siapa yang memberi tip paling menarik.
+- Daripada membuang uang untuk langganan RPC bulanan, cukup naikkan parameter `priorityGwei` di kode (misal dari default 2 Gwei menjadi **5–15 Gwei**). Biayanya hanya sekitar **$0.50 – $1.50** on-chain, tetapi bundle Anda akan langsung diprioritaskan di antrean blok terdepan!
+
 ---
 
 ## 🕹️ Daftar Perintah Utama

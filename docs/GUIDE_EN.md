@@ -98,6 +98,16 @@ Understanding each parameter in your `.env` configuration avoids costly mistakes
 3. `SAFE_DESTINATION_ADDRESS`: Public address (`0x...`) of your clean cold storage wallet receiving the rescued assets.
 4. `FLASHBOTS_AUTH_SIGNER_KEY`: Any freshly generated random private key (can have 0 balance). Used solely by Flashbots relays as a cryptographic signature identity to track bundle reputation and mitigate DoS attacks.
 
+### D. Is a Paid (Premium) RPC Necessary for Speed?
+> 🚀 **SHORT ANSWER: NOT AT ALL!** Paying $50–$200/month for a commercial RPC subscription is completely unnecessary.
+
+1. **Identical Low Latency:** Alchemy/Infura free and paid tiers use the exact same AWS/GCP edge infrastructure (10–30ms response times).
+2. **Generous Free Quotas:** Alchemy's free tier offers 300 million compute units per month—more than enough for thousands of rescue runs.
+3. **Open Relay Infrastructure:** The `relay.flashbots.net` endpoint has no paid priority lane; every searcher enters through the same door.
+
+#### 💡 The Real Acceleration Secret:
+Block inclusion priority is decided by **Block Builder Tips (`priorityGwei`)**, not RPC subscriptions. Raising `priorityGwei` from 2 to **5–15 Gwei** (costing only ~$0.50–$1.50 in gas) ensures block builders prioritize your bundle at the very top of the block!
+
 ---
 
 ## 4. Local Execution vs Cloud VPS: Security Analysis & The Downsides
